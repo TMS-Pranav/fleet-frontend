@@ -1,0 +1,186 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* WattBank EMS Design System — Kalpa Power
+ * All tokens use the --wb- prefix per spec section 2.5.
+ */
+
+@theme inline {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+
+  --color-background: var(--wb-bg);
+  --color-foreground: var(--wb-text1);
+  --color-card: var(--wb-card);
+  --color-card-foreground: var(--wb-text1);
+  --color-popover: var(--wb-card);
+  --color-popover-foreground: var(--wb-text1);
+  --color-primary: var(--wb-orange);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--wb-navy-light);
+  --color-secondary-foreground: var(--wb-navy);
+  --color-muted: var(--wb-bg2);
+  --color-muted-foreground: var(--wb-text2);
+  --color-accent: var(--wb-orange-tint);
+  --color-accent-foreground: var(--wb-navy);
+  --color-destructive: var(--wb-red);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--wb-border);
+  --color-input: var(--wb-border2);
+  --color-ring: var(--wb-orange);
+
+  --color-wb-navy: var(--wb-navy);
+  --color-wb-navy-dark: var(--wb-navy-dark);
+  --color-wb-navy-mid: var(--wb-navy-mid);
+  --color-wb-navy-light: var(--wb-navy-light);
+  --color-wb-orange: var(--wb-orange);
+  --color-wb-orange-dark: var(--wb-orange-dark);
+  --color-wb-orange-light: var(--wb-orange-light);
+  --color-wb-orange-tint: var(--wb-orange-tint);
+  --color-wb-green: var(--wb-green);
+  --color-wb-amber: var(--wb-amber);
+  --color-wb-red: var(--wb-red);
+  --color-wb-blue: var(--wb-blue);
+  --color-wb-purple: var(--wb-purple);
+  --color-wb-solar: var(--wb-amber);
+  --color-wb-bg: var(--wb-bg);
+  --color-wb-bg2: var(--wb-bg2);
+  --color-wb-card: var(--wb-card);
+  --color-wb-border: var(--wb-border);
+  --color-wb-border2: var(--wb-border2);
+  --color-wb-text1: var(--wb-text1);
+  --color-wb-text2: var(--wb-text2);
+  --color-wb-text3: var(--wb-text3);
+
+  --font-sans: "Inter", "Intel One Text", system-ui, sans-serif;
+  --font-display: "Inter", "Intel One Display", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --radius: 12px;
+
+  /* Brand */
+  --wb-navy: #1a2b4a;
+  --wb-navy-dark: #0f1d33;
+  --wb-navy-mid: #263c60;
+  --wb-navy-light: #e8edf5;
+  --wb-orange: #f47920;
+  --wb-orange-dark: #e8621a;
+  --wb-orange-light: #fff3e0;
+  --wb-orange-tint: #ffecd6;
+
+  /* Semantic */
+  --wb-green: #22c55e;
+  --wb-amber: #f59e0b;
+  --wb-red: #ef4444;
+  --wb-blue: #3b82f6;
+  --wb-purple: #8b5cf6;
+
+  /* Surfaces */
+  --wb-bg: #f4f6f9;
+  --wb-bg2: #eef1f6;
+  --wb-card: #ffffff;
+  --wb-border: #d8e2ee;
+  --wb-border2: #c4d4e4;
+
+  /* Text */
+  --wb-text1: #1a2b4a;
+  --wb-text2: #4a6080;
+  --wb-text3: #8aa0bc;
+  --wb-text-inv: #ffffff;
+
+  /* Shadows */
+  --wb-shadow-sm: 0 1px 2px rgba(15, 29, 51, 0.04);
+  --wb-shadow: 0 2px 6px rgba(15, 29, 51, 0.06), 0 1px 2px rgba(15, 29, 51, 0.04);
+  --wb-shadow-lg: 0 8px 24px rgba(15, 29, 51, 0.08);
+
+  /* Gradients */
+  --wb-grad-orange: linear-gradient(135deg, #f47920 0%, #e8621a 100%);
+  --wb-grad-flow: linear-gradient(90deg, var(--wb-orange) 0%, rgba(244, 121, 32, 0.2) 100%);
+
+  /* shadcn compat */
+  --background: var(--wb-bg);
+  --foreground: var(--wb-text1);
+  --card: var(--wb-card);
+  --card-foreground: var(--wb-text1);
+  --popover: var(--wb-card);
+  --popover-foreground: var(--wb-text1);
+  --primary: var(--wb-orange);
+  --primary-foreground: #ffffff;
+  --secondary: var(--wb-navy-light);
+  --secondary-foreground: var(--wb-navy);
+  --muted: var(--wb-bg2);
+  --muted-foreground: var(--wb-text2);
+  --accent: var(--wb-orange-tint);
+  --accent-foreground: var(--wb-navy);
+  --destructive: var(--wb-red);
+  --destructive-foreground: #ffffff;
+  --border: var(--wb-border);
+  --input: var(--wb-border2);
+  --ring: var(--wb-orange);
+  --sidebar: var(--wb-card);
+  --sidebar-foreground: var(--wb-text1);
+  --sidebar-primary: var(--wb-orange);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--wb-orange-tint);
+  --sidebar-accent-foreground: var(--wb-navy);
+  --sidebar-border: var(--wb-border);
+  --sidebar-ring: var(--wb-orange);
+}
+
+@layer base {
+  * {
+    border-color: var(--wb-border);
+  }
+  html, body {
+    background-color: var(--wb-bg);
+    color: var(--wb-text1);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    color: var(--wb-text1);
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .wb-card {
+    background: var(--wb-card);
+    border: 1px solid var(--wb-border);
+    border-radius: 14px;
+    box-shadow: var(--wb-shadow);
+  }
+  .wb-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--wb-text3);
+  }
+  .wb-grad-orange {
+    background: var(--wb-grad-orange);
+  }
+  @keyframes wb-flow {
+    0% { background-position: 0% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .wb-flow-line {
+    background: linear-gradient(90deg, var(--wb-orange), rgba(244,121,32,0.15), var(--wb-orange));
+    background-size: 200% 100%;
+    animation: wb-flow 2s linear infinite;
+  }
+  @keyframes wb-pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .wb-pulse { animation: wb-pulse-dot 1.6s ease-in-out infinite; }
+}
