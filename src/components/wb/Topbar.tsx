@@ -2,22 +2,18 @@ import { Bell, Search, ChevronDown } from "lucide-react";
 
 export function Topbar() {
   return (
-    <header className="sticky top-0 z-40 h-14 bg-[var(--wb-navy)] text-white flex items-center px-6 gap-6 border-b border-[var(--wb-navy-dark)]">
-      <div className="flex items-center gap-2.5">
-        <div className="h-9 w-9 rounded-lg bg-white/10 p-1 flex items-center justify-center">
+    <header className="sticky top-0 z-40 h-16 bg-[var(--wb-navy)] text-white flex items-center px-6 gap-6 border-b border-[var(--wb-navy-dark)]">
+      <div className="flex items-center gap-3">
+        <div className="h-14 w-14 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm">
           <img
-            src="https://solar.twaritmobility.com/assets/images/KalpaLogo.png"
+            src="/assets/kalpalogo.png"
             alt="Kalpa Power"
-            className="h-7 w-7 object-contain"
+            className="h-12 w-12 object-contain"
           />
         </div>
         <div className="leading-tight">
-          <div className="text-[13px] font-semibold tracking-wide">WattBank EMS</div>
-          <img
-            src="https://solar.twaritmobility.com/assets/images/KalpaLogo.png"
-            alt="Kalpa Power"
-            className="h-3.5 w-auto object-contain"
-          />
+          <div className="text-[15px] font-bold tracking-wide text-white">WattBank EMS</div>
+          <div className="text-[11px] text-white/55 tracking-wide">by Kalpa Power</div>
         </div>
       </div>
 

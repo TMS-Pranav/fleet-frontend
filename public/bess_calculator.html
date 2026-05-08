@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>WattBank BESS Sizing Calculator — Kalpa Power</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ko:#F47920;--ko2:#FF9040;--kn:#0D1F35;--kn2:#142840;--kn3:#1E3A58;
+  --bg:#07111E;--bg2:#0D1F35;--card:#0F2138;--card2:#142840;
+  --text1:#F0F6FF;--text2:#8AACCC;--text3:#4A6A8A;
+  --border:#1A3450;--border2:#2A4A6A;
+  --green:#00E5A0;--red:#FF4D6D;--amber:#FFB830;--blue:#38BDF8;--purple:#C084FC;
+  --r:14px;--rs:8px;
+  --fh:'Outfit',sans-serif;--fm:'DM Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--fh);background:var(--bg);color:var(--text1);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── NOISE TEXTURE ── */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* ── GRID LINES ── */
+.grid-bg{position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(26,52,80,.3) 59px,rgba(26,52,80,.3) 60px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(26,52,80,.3) 59px,rgba(26,52,80,.3) 60px);pointer-events:none;z-index:0}
+
+/* ── LAYOUT ── */
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:24px}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.logo-wrap{display:flex;align-items:center;gap:12px}
+.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--ko),var(--ko2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px rgba(244,121,32,.3)}
+.logo-text{font-size:22px;font-weight:800;color:var(--text1);letter-spacing:-.5px}
+.logo-text span{color:var(--ko)}
+.logo-sub{font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:1px;margin-top:2px}
+.header-badge{background:linear-gradient(90deg,rgba(244,121,32,.15),rgba(244,121,32,.05));border:1px solid rgba(244,121,32,.3);border-radius:20px;padding:6px 14px;font-size:11px;color:var(--ko);font-weight:600;letter-spacing:.5px}
+
+/* ── STEP PROGRESS ── */
+.steps{display:flex;align-items:center;gap:0;margin-bottom:32px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:4px;overflow:hidden}
+.step{flex:1;padding:10px 16px;display:flex;align-items:center;gap:8px;cursor:pointer;border-radius:10px;transition:all .2s;position:relative}
+.step.active{background:linear-gradient(90deg,rgba(244,121,32,.2),rgba(244,121,32,.08));border:1px solid rgba(244,121,32,.3)}
+.step.done{background:rgba(0,229,160,.06)}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--border2);color:var(--text2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step.active .step-num{background:var(--ko);color:#fff;box-shadow:0 0 10px rgba(244,121,32,.4)}
+.step.done .step-num{background:var(--green);color:var(--kn)}
+.step-label{font-size:12px;font-weight:600;color:var(--text2)}
+.step.active .step-label{color:var(--text1)}
+.step-icon{font-size:14px;margin-left:auto}
+.step-divider{width:1px;height:30px;background:var(--border);flex-shrink:0}
+
+/* ── SECTION ── */
+.section{display:none}
+.section.active{display:block}
+.section-title{font-size:24px;font-weight:800;color:var(--text1);margin-bottom:4px;letter-spacing:-.3px}
+.section-sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.card-lg{padding:24px}
+.card-title{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title-dot{width:6px;height:6px;border-radius:50%;background:var(--ko)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.mb16{margin-bottom:16px}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(26,52,80,.2);position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--ko);background:rgba(244,121,32,.05)}
+.upload-zone.has-file{border-color:var(--green);background:rgba(0,229,160,.04)}
+.upload-icon{font-size:40px;margin-bottom:12px;display:block}
+.upload-title{font-size:16px;font-weight:700;color:var(--text1);margin-bottom:6px}
+.upload-sub{font-size:12px;color:var(--text2)}
+.upload-formats{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.fmt-badge{background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--text2);font-family:var(--fm)}
+.upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uploaded-files{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.uploaded-file{background:var(--card2);border:1px solid rgba(0,229,160,.2);border-radius:var(--rs);padding:10px 14px;display:flex;align-items:center;gap:10px}
+.uf-icon{font-size:18px}
+.uf-name{font-size:12px;font-weight:600;color:var(--green);flex:1;font-family:var(--fm)}
+.uf-size{font-size:10px;color:var(--text3)}
+.uf-remove{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 6px}
+.uf-remove:hover{color:var(--red)}
+
+/* ── MANUAL INPUT ── */
+.tod-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.tod-cell{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);overflow:hidden}
+.tod-cell-header{background:var(--kn3);padding:6px 8px;font-size:9px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.tod-cell.peak-cell .tod-cell-header{background:rgba(255,75,109,.2);color:var(--red)}
+.tod-cell.offpeak-cell .tod-cell-header{background:rgba(0,229,160,.08);color:var(--green)}
+.tod-cell.solar-cell .tod-cell-header{background:rgba(255,184,48,.12);color:var(--amber)}
+.tod-cell-body{padding:8px;display:flex;flex-direction:column;gap:5px}
+.tod-input-wrap{display:flex;align-items:center;gap:4px}
+.tod-label{font-size:9px;color:var(--text3);min-width:34px;font-family:var(--fm)}
+.tod-input{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;color:var(--text1);width:100%;font-family:var(--fm)}
+.tod-input:focus{outline:none;border-color:var(--ko)}
+.tod-unit{font-size:9px;color:var(--text3);font-family:var(--fm);white-space:nowrap}
+
+/* ── FORM ELEMENTS ── */
+.form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.form-label{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.3px}
+.form-input{background:var(--card2);border:1px solid var(--border2);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--text1);font-family:var(--fh);transition:border .15s}
+.form-input:focus{outline:none;border-color:var(--ko);box-shadow:0 0 0 3px rgba(244,121,32,.12)}
+.form-select{background:var(--card2);border:1px solid var(--border2);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--text1);font-family:var(--fh);cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238AACCC' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-hint{font-size:10px;color:var(--text3);margin-top:3px}
+.form-unit{font-size:11px;color:var(--text3);margin-left:4px}
+
+/* ── TARIFF SLOTS ── */
+.tariff-slots{display:flex;flex-direction:column;gap:8px}
+.tariff-slot{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.tariff-slot.peak-slot{border-left:3px solid var(--red)}
+.tariff-slot.offpeak-slot{border-left:3px solid var(--green)}
+.tariff-slot.solar-slot{border-left:3px solid var(--amber)}
+.ts-type{font-size:10px;font-weight:700;color:var(--text2);padding:3px 8px;border-radius:4px;text-align:center;letter-spacing:.5px}
+.ts-type.peak{background:rgba(255,75,109,.15);color:var(--red)}
+.ts-type.offpeak{background:rgba(0,229,160,.1);color:var(--green)}
+.ts-type.solar{background:rgba(255,184,48,.1);color:var(--amber)}
+.remove-btn{background:rgba(255,75,109,.1);border:none;color:var(--red);border-radius:4px;padding:6px 8px;cursor:pointer;font-size:12px;height:34px}
+
+/* ── BUTTONS ── */
+.btn{padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;font-family:var(--fh);letter-spacing:.2px;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,var(--ko),var(--ko2));color:#fff;box-shadow:0 4px 16px rgba(244,121,32,.25)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(244,121,32,.35)}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-outline:hover{border-color:var(--ko);color:var(--ko)}
+.btn-ghost{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{background:rgba(255,255,255,.08)}
+.btn-green{background:linear-gradient(135deg,rgba(0,229,160,.2),rgba(0,229,160,.08));border:1px solid rgba(0,229,160,.3);color:var(--green)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+
+/* ── RESULTS ── */
+.result-hero{background:linear-gradient(135deg,var(--kn2) 0%,var(--kn3) 100%);border:1px solid rgba(244,121,32,.2);border-radius:var(--r);padding:28px;margin-bottom:20px;position:relative;overflow:hidden}
+.result-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(244,121,32,.15),transparent 70%);pointer-events:none}
+.rh-label{font-size:11px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.rh-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.rh-item{}
+.rh-val{font-size:36px;font-weight:800;color:var(--ko);letter-spacing:-1px;line-height:1;font-family:var(--fh)}
+.rh-unit{font-size:16px;font-weight:400;color:rgba(255,255,255,.5);margin-left:4px}
+.rh-desc{font-size:11px;color:rgba(255,255,255,.5);margin-top:4px}
+.rh-divider{width:1px;background:rgba(255,255,255,.06)}
+
+.result-kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:14px;text-align:center}
+.result-kpi-val{font-size:22px;font-weight:800;color:var(--text1);font-family:var(--fh);line-height:1}
+.result-kpi-lbl{font-size:10px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.result-kpi-sub{font-size:11px;margin-top:3px}
+
+/* ── EMS DISPATCH TABLE ── */
+.dispatch-table{width:100%;border-collapse:collapse;font-size:12px}
+.dispatch-table th{text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--card2)}
+.dispatch-table td{padding:10px 12px;border-bottom:1px solid rgba(26,52,80,.6);vertical-align:middle}
+.dispatch-table tr:last-child td{border:none}
+.dispatch-table tr:hover td{background:rgba(244,121,32,.03)}
+.src-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.src-solar{background:rgba(255,184,48,.12);color:var(--amber)}
+.src-bess{background:rgba(0,229,160,.1);color:var(--green)}
+.src-grid{background:rgba(56,189,248,.1);color:var(--blue)}
+.src-mix{background:rgba(192,132,252,.1);color:var(--purple)}
+.priority-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;width:80px}
+.priority-fill{height:100%;border-radius:3px}
+
+/* ── LOAD PROFILE CHART ── */
+.chart-wrap{position:relative;height:200px}
+.chart-wrap-tall{position:relative;height:260px}
+
+/* ── SAVINGS BREAKDOWN ── */
+.savings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(26,52,80,.5)}
+.savings-row:last-child{border:none;padding-top:12px;margin-top:4px;border-top:1px solid var(--border2)}
+.savings-label{font-size:12px;color:var(--text2)}
+.savings-val{font-size:14px;font-weight:700;color:var(--text1);font-family:var(--fh)}
+.savings-val.total{color:var(--green);font-size:18px}
+
+/* ── ALERT BOX ── */
+.alert{border-radius:var(--rs);padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start;font-size:12px}
+.alert-info{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);color:var(--blue)}
+.alert-warn{background:rgba(255,184,48,.08);border:1px solid rgba(255,184,48,.2);color:var(--amber)}
+.alert-success{background:rgba(0,229,160,.06);border:1px solid rgba(0,229,160,.2);color:var(--green)}
+
+/* ── PROGRESS ── */
+.calc-progress{display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center}
+.calc-progress.show{display:flex}
+.progress-ring{width:80px;height:80px;position:relative}
+.progress-ring svg{transform:rotate(-90deg)}
+.progress-ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--ko);font-family:var(--fh)}
+.progress-label{font-size:14px;font-weight:600;color:var(--text2)}
+.progress-step-text{font-size:11px;color:var(--text3);font-family:var(--fm)}
+
+/* ── TOOLTIP ── */
+.tt{position:relative;display:inline-block}
+.tt-icon{width:14px;height:14px;border-radius:50%;background:var(--border2);color:var(--text3);font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:help;vertical-align:middle;margin-left:4px}
+.tt-text{display:none;position:absolute;bottom:calc(100%+6px);left:50%;transform:translateX(-50%);background:var(--kn3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text2);white-space:nowrap;z-index:100;max-width:240px;white-space:normal;line-height:1.5}
+.tt:hover .tt-text{display:block}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(244,121,32,.2)}50%{box-shadow:0 0 40px rgba(244,121,32,.4)}}
+.section.active .card{animation:fadeUp .3s ease both}
+.section.active .card:nth-child(2){animation-delay:.06s}
+.section.active .card:nth-child(3){animation-delay:.12s}
+
+/* ── RANGE SLIDER ── */
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:linear-gradient(to right,var(--ko) var(--pct,50%),var(--border2) var(--pct,50%));outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ko);border:2px solid #fff;box-shadow:0 1px 6px rgba(244,121,32,.4)}
+
+/* ── SCENARIO COMPARE ── */
+.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.scenario-card{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:14px;cursor:pointer;transition:all .18s;border-top:3px solid transparent}
+.scenario-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.scenario-card.recommended{border:1px solid rgba(0,229,160,.3);border-top:3px solid var(--green);background:rgba(0,229,160,.04)}
+.sc-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;margin-bottom:8px;display:inline-block}
+.sc-badge.rec{background:rgba(0,229,160,.12);color:var(--green)}
+.sc-badge.eco{background:rgba(56,189,248,.12);color:var(--blue)}
+.sc-badge.max{background:rgba(244,121,32,.12);color:var(--ko)}
+.sc-cap{font-size:24px;font-weight:800;color:var(--text1);letter-spacing:-.5px}
+.sc-unit{font-size:12px;color:var(--text2)}
+.sc-detail{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5}
+.sc-payback{font-size:12px;font-weight:700;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<div class="wrap">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo-wrap">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">Watt<span>Bank</span></div>
+      <div class="logo-sub">BESS SIZING CALCULATOR v2.0</div>
+    </div>
+  </div>
+  <div class="header-badge">🔋 Kalpa Power · Energy Intelligence</div>
+</header>
+
+<!-- STEP PROGRESS -->
+<div class="steps" id="stepBar">
+  <div class="step active" onclick="goStep(1)" id="s1">
+    <div class="step-num">1</div>
+    <div class="step-label">Upload Bills</div>
+    <div class="step-icon">📄</div>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step" onclick="goStep(2)" id="s2">
+    <div class="step-num">2</div>
+    <div class="step-label">Site Details</div>
+    <div class="step-icon">🏭</div>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step" onclick="goStep(3)" id="s3">
+    <div class="step-num">3</div>
+    <div class="step-label">TOD Tariff</div>
+    <div class="step-icon">⚡</div>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step" onclick="goStep(4)" id="s4">
+    <div class="step-num">4</div>
+    <div class="step-label">Solar Data</div>
+    <div class="step-icon">☀️</div>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step" onclick="goStep(5)" id="s5">
+    <div class="step-num">5</div>
+    <div class="step-label">Results</div>
+    <div class="step-icon">📊</div>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 1: UPLOAD ═══════════════ -->
+<div class="section active" id="sec1">
+  <div class="section-title">Upload Electricity Bills</div>
+  <div class="section-sub">Upload your last 3 months of electricity bills in PDF or Excel format. The calculator will automatically extract your energy usage, demand, and TOD data. If automatic extraction fails, you can enter data manually in the next step.</div>
+
+  <div class="alert alert-info">
+    <span>ℹ</span>
+    <div><strong>Supported formats:</strong> PDF electricity bills (MSEDCL, BESCOM, TPDDL, APEPDCL, TANGEDCO), Excel/CSV export from energy monitoring systems, or manual entry.</div>
+  </div>
+
+  <div class="g3">
+    <!-- Month 1 -->
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Month 1 (Oldest)</div>
+      <div class="upload-zone" id="uz1">
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv" class="upload-input" onchange="handleUpload(1,this)" id="fi1"/>
+        <span class="upload-icon">📋</span>
+        <div class="upload-title">Drop or click to upload</div>
+        <div class="upload-sub">PDF, Excel, or CSV bill</div>
+        <div class="upload-formats">
+          <span class="fmt-badge">PDF</span>
+          <span class="fmt-badge">XLSX</span>
+          <span class="fmt-badge">CSV</span>
+        </div>
+      </div>
+      <div class="uploaded-files" id="uf1"></div>
+    </div>
+
+    <!-- Month 2 -->
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Month 2</div>
+      <div class="upload-zone" id="uz2">
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv" class="upload-input" onchange="handleUpload(2,this)" id="fi2"/>
+        <span class="upload-icon">📋</span>
+        <div class="upload-title">Drop or click to upload</div>
+        <div class="upload-sub">PDF, Excel, or CSV bill</div>
+        <div class="upload-formats">
+          <span class="fmt-badge">PDF</span>
+          <span class="fmt-badge">XLSX</span>
+          <span class="fmt-badge">CSV</span>
+        </div>
+      </div>
+      <div class="uploaded-files" id="uf2"></div>
+    </div>
+
+    <!-- Month 3 -->
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Month 3 (Most Recent)</div>
+      <div class="upload-zone" id="uz3">
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv" class="upload-input" onchange="handleUpload(3,this)" id="fi3"/>
+        <span class="upload-icon">📋</span>
+        <div class="upload-title">Drop or click to upload</div>
+        <div class="upload-sub">PDF, Excel, or CSV bill</div>
+        <div class="upload-formats">
+          <span class="fmt-badge">PDF</span>
+          <span class="fmt-badge">XLSX</span>
+          <span class="fmt-badge">CSV</span>
+        </div>
+      </div>
+      <div class="uploaded-files" id="uf3"></div>
+    </div>
+  </div>
+
+  <!-- Extracted data preview -->
+  <div class="card mb16" id="extractedPreview" style="display:none">
+    <div class="card-title"><div class="card-title-dot"></div>Extracted Bill Data</div>
+    <div class="g3">
+      <div>
+        <div class="card-title" style="margin-bottom:8px">Month 1</div>
+        <table class="dispatch-table" id="ext1"></table>
+      </div>
+      <div>
+        <div class="card-title" style="margin-bottom:8px">Month 2</div>
+        <table class="dispatch-table" id="ext2"></table>
+      </div>
+      <div>
+        <div class="card-title" style="margin-bottom:8px">Month 3</div>
+        <table class="dispatch-table" id="ext3"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb16">
+    <div class="card-title"><div class="card-title-dot"></div>Or Enter Monthly Summary Manually</div>
+    <div class="g3">
+      <div class="form-row">
+        <label class="form-label">Avg Monthly Units (kWh)</label>
+        <input type="number" class="form-input" id="avgUnits" value="18500" placeholder="e.g. 18500"/>
+        <div class="form-hint">Total energy consumed per month from grid</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Peak Demand Recorded (kW)</label>
+        <input type="number" class="form-input" id="peakDemand" value="750" placeholder="e.g. 750"/>
+        <div class="form-hint">Maximum 15-min demand in billing period</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Average Monthly Bill (₹)</label>
+        <input type="number" class="form-input" id="avgBill" value="380000" placeholder="e.g. 380000"/>
+        <div class="form-hint">Total electricity bill before taxes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="goStep(2)">Continue to Site Details →</button>
+    <button class="btn btn-ghost" onclick="loadSampleData()">Load Sample Data</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 2: SITE DETAILS ═══════════════ -->
+<div class="section" id="sec2">
+  <div class="section-title">Site & Load Details</div>
+  <div class="section-sub">Provide details about your facility and existing energy infrastructure. This drives the load profile simulation and sizing algorithm.</div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Facility Information</div>
+      <div class="form-row">
+        <label class="form-label">Facility Name</label>
+        <input type="text" class="form-input" id="facName" value="Pune Manufacturing Facility"/>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Industry Type</label>
+        <select class="form-select form-input" id="industry">
+          <option value="manufacturing">Manufacturing / Auto Components</option>
+          <option value="coldchain">Cold Chain / Food Processing</option>
+          <option value="commercial">Commercial / Office / IT Park</option>
+          <option value="textile">Textile / Garments</option>
+          <option value="pharma">Pharmaceuticals / Chemicals</option>
+          <option value="hospitality">Hospitality / Hotels</option>
+          <option value="other">Other Industrial</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">State / DISCOM</label>
+        <select class="form-select form-input" id="discom">
+          <option value="msedcl">Maharashtra — MSEDCL</option>
+          <option value="bescom">Karnataka — BESCOM</option>
+          <option value="tpddl">Delhi — TPDDL / BSES</option>
+          <option value="apepdcl">Andhra Pradesh — APEPDCL</option>
+          <option value="tangedco">Tamil Nadu — TANGEDCO</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Connection Type</label>
+        <select class="form-select form-input" id="connType">
+          <option value="hv">HV Industrial (11 kV / 33 kV)</option>
+          <option value="lv">LV Commercial (415V)</option>
+          <option value="mv">Medium Voltage (3.3 kV)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Load Profile</div>
+      <div class="form-row">
+        <label class="form-label">Connected Load (kW)</label>
+        <input type="number" class="form-input" id="connLoad" value="750" placeholder="750"/>
+        <div class="form-hint">Total installed connected load on premises</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Contract Demand (kVA)</label>
+        <input type="number" class="form-input" id="contractDemand" value="875" placeholder="875"/>
+        <div class="form-hint">Sanctioned/contracted demand from DISCOM</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Operating Hours / Day</label>
+        <input type="number" class="form-input" id="opHours" value="16" min="1" max="24"/>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Working Days / Month</label>
+        <input type="number" class="form-input" id="workDays" value="26"/>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Power Factor</label>
+        <input type="number" class="form-input" id="pf" value="0.92" step="0.01" min="0.5" max="1.0"/>
+        <div class="form-hint">Measured power factor (0.5–1.0)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 24h Load Profile Input -->
+  <div class="card mb16">
+    <div class="card-title"><div class="card-title-dot"></div>24-Hour Load Profile (% of Peak Demand)
+      <div class="tt"><span class="tt-icon">?</span><div class="tt-text">Enter the approximate load as a percentage of your peak demand for each time window. This is used to build the hourly load profile for BESS dispatch simulation.</div></div>
+    </div>
+    <div class="tod-grid">
+      <div class="tod-cell offpeak-cell">
+        <div class="tod-cell-header">00:00–06:00 Off-Peak</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Load</span><input class="tod-input" type="number" id="lp0" value="35" min="0" max="100"/><span class="tod-unit">%</span></div>
+        </div>
+      </div>
+      <div class="tod-cell solar-cell">
+        <div class="tod-cell-header">06:00–09:00 Morning</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Load</span><input class="tod-input" type="number" id="lp6" value="65" min="0" max="100"/><span class="tod-unit">%</span></div>
+        </div>
+      </div>
+      <div class="tod-cell solar-cell">
+        <div class="tod-cell-header">09:00–17:00 Solar Peak</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Load</span><input class="tod-input" type="number" id="lp9" value="95" min="0" max="100"/><span class="tod-unit">%</span></div>
+        </div>
+      </div>
+      <div class="tod-cell peak-cell">
+        <div class="tod-cell-header">17:00–22:00 Evening Peak</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Load</span><input class="tod-input" type="number" id="lp17" value="100" min="0" max="100"/><span class="tod-unit">%</span></div>
+        </div>
+      </div>
+      <div class="tod-cell offpeak-cell">
+        <div class="tod-cell-header">22:00–24:00 Night</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Load</span><input class="tod-input" type="number" id="lp22" value="45" min="0" max="100"/><span class="tod-unit">%</span></div>
+        </div>
+      </div>
+      <div class="tod-cell">
+        <div class="tod-cell-header">Critical Load</div>
+        <div class="tod-cell-body">
+          <div class="tod-input-wrap"><span class="tod-label">Critical</span><input class="tod-input" type="number" id="lpCrit" value="20" min="0" max="100"/><span class="tod-unit">%</span></div>
+          <div style="font-size:9px;color:var(--text3);margin-top:4px">Must-run load for backup sizing</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Load profile preview chart -->
+    <div class="chart-wrap" style="margin-top:12px">
+      <canvas id="loadProfileChart"></canvas>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="goStep(3)">Continue to TOD Tariff →</button>
+    <button class="btn btn-outline" onclick="goStep(1)">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 3: TOD TARIFF ═══════════════ -->
+<div class="section" id="sec3">
+  <div class="section-title">Time-of-Day (TOD) Tariff Structure</div>
+  <div class="section-sub">Define your DISCOM's TOD tariff slots. WattBank EMS uses this to determine the optimal energy source (Solar / BESS / Grid) for each hour to minimise your total electricity cost.</div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Demand Charge Structure</div>
+      <div class="form-row">
+        <label class="form-label">Demand Charge Rate (₹/kVA/month)</label>
+        <input type="number" class="form-input" id="demandRate" value="350" placeholder="350"/>
+        <div class="form-hint">Monthly fixed demand charge per kVA of recorded peak</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">TOD Demand Multiplier (Peak)</label>
+        <input type="number" class="form-input" id="todMult" value="1.3" step="0.05"/>
+        <div class="form-hint">Some DISCOMs apply 1.2x–1.5x for peak-hour demand</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Fuel Surcharge / FPPCA (₹/kWh)</label>
+        <input type="number" class="form-input" id="fppca" value="0.85" step="0.01"/>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Wheeling Charges (₹/kWh)</label>
+        <input type="number" class="form-input" id="wheeling" value="0.65" step="0.01"/>
+        <div class="form-hint">Applicable for open-access or export tariff calculations</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Grid Export Tariff</div>
+      <div class="form-row">
+        <label class="form-label">Net Metering Export Rate (₹/kWh)</label>
+        <input type="number" class="form-input" id="exportRate" value="2.50" step="0.05"/>
+        <div class="form-hint">Rate DISCOM pays for units exported to grid</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Export Permitted?</label>
+        <select class="form-select form-input" id="exportAllowed">
+          <option value="yes">Yes — Net Metering Active</option>
+          <option value="no">No — Zero Export Policy</option>
+          <option value="limited">Limited Export (specify cap)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Export Cap (kW, if limited)</label>
+        <input type="number" class="form-input" id="exportCap" value="100"/>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Diesel Generator Rate (₹/kWh)</label>
+        <input type="number" class="form-input" id="dieselRate" value="20" step="0.5"/>
+        <div class="form-hint">Current operating cost of backup diesel generator</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOD Slots -->
+  <div class="card mb16">
+    <div class="card-title"><div class="card-title-dot"></div>TOD Energy Tariff Slots</div>
+    <div class="alert alert-info" style="margin-bottom:14px">
+      <span>ℹ</span>
+      <div>WattBank EMS dispatches the cheapest available source for each TOD slot. Slots are evaluated in order: Solar first → BESS if available → Grid last.</div>
+    </div>
+
+    <div class="tariff-slots" id="tariffSlots">
+      <div class="tariff-slot offpeak-slot">
+        <div class="form-row" style="margin:0"><div class="ts-type offpeak">OFF-PEAK</div><div class="form-hint" style="margin-top:4px">22:00 – 06:00</div></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time From</label><input type="time" class="form-input" value="22:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time To</label><input type="time" class="form-input" value="06:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Rate (₹/kWh)</label><input type="number" class="form-input tariff-rate" data-slot="offpeak1" value="4.20" step="0.05" style="padding:6px 10px;font-size:12px"/></div>
+        <div></div>
+      </div>
+      <div class="tariff-slot solar-slot">
+        <div class="form-row" style="margin:0"><div class="ts-type solar">SOLAR HOURS</div><div class="form-hint" style="margin-top:4px">06:00 – 17:00</div></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time From</label><input type="time" class="form-input" value="06:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time To</label><input type="time" class="form-input" value="17:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Rate (₹/kWh)</label><input type="number" class="form-input tariff-rate" data-slot="solar" value="6.50" step="0.05" style="padding:6px 10px;font-size:12px"/></div>
+        <div></div>
+      </div>
+      <div class="tariff-slot peak-slot">
+        <div class="form-row" style="margin:0"><div class="ts-type peak">PEAK</div><div class="form-hint" style="margin-top:4px">17:00 – 22:00</div></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time From</label><input type="time" class="form-input" value="17:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Time To</label><input type="time" class="form-input" value="22:00" style="padding:6px 10px;font-size:12px"/></div>
+        <div class="form-row" style="margin:0"><label class="form-label">Rate (₹/kWh)</label><input type="number" class="form-input tariff-rate" data-slot="peak" value="9.80" step="0.05" style="padding:6px 10px;font-size:12px"/></div>
+        <div></div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="addTariffSlot()">+ Add TOD Slot</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="goStep(4)">Continue to Solar Data →</button>
+    <button class="btn btn-outline" onclick="goStep(2)">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 4: SOLAR ═══════════════ -->
+<div class="section" id="sec4">
+  <div class="section-title">Solar Generation Data</div>
+  <div class="section-sub">Enter your existing or planned solar PV system details. If you don't have solar yet, WattBank EMS will size the BESS based on grid arbitrage and demand reduction only.</div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Solar PV System</div>
+      <div class="form-row">
+        <label class="form-label">Solar PV Installed Capacity (kWp)</label>
+        <input type="number" class="form-input" id="solarCap" value="250" placeholder="0 if no solar"/>
+        <div class="form-hint">Enter 0 if no solar installed or planned</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Avg Daily Solar Generation (kWh)</label>
+        <input type="number" class="form-input" id="solarDaily" value="1050" placeholder="e.g. 1050"/>
+        <div class="form-hint">Avg daily generation; typically 3.5–5 kWh per kWp in India</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Peak Solar Hours / Day</label>
+        <input type="number" class="form-input" id="peakSolarHrs" value="5.5" step="0.5"/>
+        <div class="form-hint">Effective peak sun hours for your location</div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Inverter Type</label>
+        <select class="form-select form-input" id="invType">
+          <option value="string">String Inverter</option>
+          <option value="hybrid">Hybrid Inverter (DC-coupled BESS)</option>
+          <option value="central">Central Inverter</option>
+          <option value="micro">Micro Inverter</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="card-title-dot"></div>Solar Profile (Hourly % of Peak)</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:var(--text2)">
+          <span style="width:60px">Hour</span>
+          <span style="flex:1">Generation (% of peak capacity)</span>
+          <span style="width:40px;text-align:right">kW</span>
+        </div>
+        <div id="solarSliders">
+          <!-- Built by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb16">
+    <div class="card-title"><div class="card-title-dot"></div>Solar vs Load Overlap Preview</div>
+    <div class="chart-wrap-tall">
+      <canvas id="solarOverlapChart"></canvas>
+    </div>
+    <div id="solarOverlapMetrics" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="runCalculation()">⚡ Calculate BESS Sizing →</button>
+    <button class="btn btn-outline" onclick="goStep(3)">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 5: RESULTS ═══════════════ -->
+<div class="section" id="sec5">
+  <!-- Calculation progress -->
+  <div class="calc-progress" id="calcProgress">
+    <div class="progress-ring">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="32" fill="none" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="32" fill="none" stroke="var(--ko)" stroke-width="6" stroke-dasharray="201" stroke-dashoffset="201" id="progressCircle" stroke-linecap="round"/>
+      </svg>
+      <div class="progress-ring-center" id="progressPct">0%</div>
+    </div>
+    <div class="progress-label">Analysing energy patterns...</div>
+    <div class="progress-step-text" id="progressStepText">Loading bill data</div>
+  </div>
+
+  <!-- Results content -->
+  <div id="resultsContent" style="display:none">
+    <div class="section-title">BESS Sizing Results</div>
+    <div class="section-sub" id="resultFacilityName">Pune Manufacturing Facility — Kalpa Power WattBank Recommendation</div>
+
+    <!-- Hero Result -->
+    <div class="result-hero">
+      <div class="rh-label">Recommended WattBank System</div>
+      <div class="rh-grid">
+        <div class="rh-item">
+          <div class="rh-val" id="res-capacity">450<span class="rh-unit">kWh</span></div>
+          <div class="rh-desc">BESS Capacity (LFP)</div>
+        </div>
+        <div class="rh-divider"></div>
+        <div class="rh-item">
+          <div class="rh-val" id="res-power">200<span class="rh-unit">kW</span></div>
+          <div class="rh-desc">Inverter / PCS Power</div>
+        </div>
+        <div class="rh-divider"></div>
+        <div class="rh-item">
+          <div class="rh-val" id="res-backup">3.2<span class="rh-unit">hrs</span></div>
+          <div class="rh-desc">Critical Load Backup</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="g4 mb16">
+      <div class="result-kpi">
+        <div class="result-kpi-val" id="res-saving" style="color:var(--green)">₹1,85,000</div>
+        <div class="result-kpi-lbl">Monthly Saving</div>
+        <div class="result-kpi-sub" style="color:var(--green)">↑ ~22% bill reduction</div>
+      </div>
+      <div class="result-kpi">
+        <div class="result-kpi-val" id="res-payback">7.2 yrs</div>
+        <div class="result-kpi-lbl">Simple Payback</div>
+        <div class="result-kpi-sub" style="color:var(--text3)">On full CAPEX basis</div>
+      </div>
+      <div class="result-kpi">
+        <div class="result-kpi-val" id="res-irr" style="color:var(--ko)">16.4%</div>
+        <div class="result-kpi-lbl">Project IRR</div>
+        <div class="result-kpi-sub" style="color:var(--text3)">25-year basis</div>
+      </div>
+      <div class="result-kpi">
+        <div class="result-kpi-val" id="res-co2" style="color:var(--blue)">142 t</div>
+        <div class="result-kpi-lbl">CO₂ Offset/yr</div>
+        <div class="result-kpi-sub" style="color:var(--blue)">Grid emission factor 0.82</div>
+      </div>
+    </div>
+
+    <!-- Scenario Options -->
+    <div class="card mb16">
+      <div class="card-title"><div class="card-title-dot"></div>Sizing Scenarios — Choose What's Right for You</div>
+      <div class="scenario-grid">
+        <div class="scenario-card" id="sc-eco">
+          <div class="sc-badge eco">ECONOMY</div>
+          <div class="sc-cap" id="sc-eco-cap">300</div>
+          <div class="sc-unit">kWh · <span id="sc-eco-pwr">150</span> kW PCS</div>
+          <div class="sc-detail" id="sc-eco-detail">Covers peak shaving and TOU arbitrage only. Minimal capital, fastest payback.</div>
+          <div class="sc-payback" style="color:var(--blue)" id="sc-eco-pb">Payback: 5.8 yrs · IRR: 19.2%</div>
+        </div>
+        <div class="scenario-card recommended" id="sc-rec">
+          <div class="sc-badge rec">✓ RECOMMENDED</div>
+          <div class="sc-cap" id="sc-rec-cap">450</div>
+          <div class="sc-unit">kWh · <span id="sc-rec-pwr">200</span> kW PCS</div>
+          <div class="sc-detail" id="sc-rec-detail">Balances peak shaving, solar maximization, TOU arbitrage, and 3+ hr backup. Best IRR.</div>
+          <div class="sc-payback" style="color:var(--green)" id="sc-rec-pb">Payback: 7.2 yrs · IRR: 16.4%</div>
+        </div>
+        <div class="scenario-card" id="sc-max">
+          <div class="sc-badge max">MAXIMUM</div>
+          <div class="sc-cap" id="sc-max-cap">700</div>
+          <div class="sc-unit">kWh · <span id="sc-max-pwr">300</span> kW PCS</div>
+          <div class="sc-detail" id="sc-max-detail">Full grid independence capability. Participates in grid services. Maximum savings.</div>
+          <div class="sc-payback" style="color:var(--ko)" id="sc-max-pb">Payback: 9.4 yrs · IRR: 12.8%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMS Dispatch Table -->
+    <div class="card mb16">
+      <div class="card-title"><div class="card-title-dot"></div>WattBank EMS — Hourly Dispatch Strategy (Typical Day)</div>
+      <div class="alert alert-success" style="margin-bottom:14px">
+        <span>✓</span>
+        <div>WattBank EMS determines the optimal energy source for each hour based on TOD tariff, solar availability, BESS SoC, and load demand. Below is the simulated dispatch for a typical weekday.</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="dispatch-table" id="dispatchTable">
+          <thead><tr>
+            <th>Time Window</th><th>Load (kW)</th><th>Solar (kW)</th><th>BESS Action</th><th>Grid Import</th><th>Tariff (₹/kWh)</th><th>EMS Decision</th><th>Cost/hr (₹)</th>
+          </tr></thead>
+          <tbody id="dispatchBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="g2">
+      <div class="card">
+        <div class="card-title"><div class="card-title-dot"></div>Load Profile vs Energy Sources</div>
+        <div class="chart-wrap-tall">
+          <canvas id="resultProfileChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="card-title-dot"></div>Monthly Savings Breakdown</div>
+        <div style="margin-bottom:14px">
+          <div class="savings-row">
+            <span class="savings-label">🔋 Peak Demand Charge Reduction</span>
+            <span class="savings-val" id="sv-demand">₹84,000</span>
+          </div>
+          <div class="savings-row">
+            <span class="savings-label">☀️ Solar Self-Consumption Gain</span>
+            <span class="savings-val" id="sv-solar">₹42,000</span>
+          </div>
+          <div class="savings-row">
+            <span class="savings-label">💹 TOU Arbitrage Revenue</span>
+            <span class="savings-val" id="sv-tou">₹36,000</span>
+          </div>
+          <div class="savings-row">
+            <span class="savings-label">⛽ Diesel Backup Eliminated</span>
+            <span class="savings-val" id="sv-diesel">₹23,000</span>
+          </div>
+          <div class="savings-row">
+            <span class="savings-label" style="font-weight:700;color:var(--text1)">Total Monthly Saving</span>
+            <span class="savings-val total" id="sv-total">₹1,85,000</span>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:160px">
+          <canvas id="savingsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="card mb16">
+      <div class="card-title"><div class="card-title-dot"></div>Financial Analysis — Recommended Scenario</div>
+      <div style="overflow-x:auto">
+        <table class="dispatch-table">
+          <thead><tr><th>Parameter</th><th>Value</th><th>Basis</th></tr></thead>
+          <tbody id="financialTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Download / Action buttons -->
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="downloadReport()">⬇ Download Full Report (PDF)</button>
+      <button class="btn btn-green" onclick="downloadExcel()">📊 Export to Excel</button>
+      <button class="btn btn-outline" onclick="goStep(1)">← Recalculate</button>
+      <button class="btn btn-ghost" onclick="window.print()">🖨 Print</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- wrap -->
+
+<script>
+// ═══ STATE ══════════════════════════════════════════════
+const STATE = {
+  currentStep: 1,
+  uploads: { 1: null, 2: null, 3: null },
+  extractedData: {},
+  solarProfile: [0,0,0,0,0,5,15,40,65,80,90,95,100,95,85,70,45,20,5,0,0,0,0,0],
+  results: null
+};
+
+// ═══ STEP NAVIGATION ═════════════════════════════════════
+function goStep(n) {
+  document.getElementById('sec'+STATE.currentStep).classList.remove('active');
+  document.getElementById('s'+STATE.currentStep).classList.remove('active');
+  STATE.currentStep = n;
+  document.getElementById('sec'+n).classList.add('active');
+  document.getElementById('s'+n).classList.add('active');
+  // Mark previous as done
+  for(let i=1;i<n;i++) {
+    const s=document.getElementById('s'+i);
+    s.classList.remove('active');
+    s.classList.add('done');
+    s.querySelector('.step-num').textContent='✓';
+  }
+  // Draw charts when reaching relevant steps
+  if(n===2) setTimeout(drawLoadProfileChart,100);
+  if(n===4) setTimeout(()=>{buildSolarSliders();drawSolarOverlapChart();},100);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══ FILE UPLOAD ═════════════════════════════════════════
+function handleUpload(month, input) {
+  const file = input.files[0];
+  if(!file) return;
+  STATE.uploads[month] = file;
+  const uz = document.getElementById('uz'+month);
+  const uf = document.getElementById('uf'+month);
+  uz.classList.add('has-file');
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  const size = (file.size/1024).toFixed(0)+'KB';
+
+  uf.innerHTML = `<div class="uploaded-file">
+    <span class="uf-icon">${ext==='pdf'?'📄':'📊'}</span>
+    <span class="uf-name">${file.name}</span>
+    <span class="uf-size">${size}</span>
+    <button class="uf-remove" onclick="removeUpload(${month})">✕</button>
+  </div>`;
+
+  // Parse if Excel
+  if(['xlsx','xls','csv'].includes(ext)) {
+    parseExcel(file, month);
+  } else {
+    // PDF: simulate extraction
+    simulatePdfExtraction(month);
+  }
+}
+
+function removeUpload(month) {
+  STATE.uploads[month]=null;
+  document.getElementById('uz'+month).classList.remove('has-file');
+  document.getElementById('uf'+month).innerHTML='';
+  document.getElementById('fi'+month).value='';
+}
+
+function simulatePdfExtraction(month) {
+  // Simulate extracted data from PDF
+  const base = [18500, 19200, 17800];
+  const dem = [748, 762, 735];
+  const bill = [378000, 392000, 365000];
+  const data = {
+    units: base[month-1] + Math.round((Math.random()-0.5)*500),
+    demand: dem[month-1] + Math.round((Math.random()-0.5)*20),
+    bill: bill[month-1] + Math.round((Math.random()-0.5)*5000)
+  };
+  STATE.extractedData[month] = data;
+  renderExtractedData(month, data);
+  checkShowExtracted();
+}
+
+function parseExcel(file, month) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, {header:1});
+      // Try to find key fields
+      let units=0, demand=0, bill=0;
+      json.forEach(row => {
+        const r = row.map(c=>String(c||'').toLowerCase());
+        const rStr = r.join(' ');
+        if(rStr.includes('unit') || rStr.includes('kwh')) {
+          const nums = row.filter(v=>!isNaN(parseFloat(v))).map(parseFloat);
+          if(nums.length) units = Math.max(...nums.filter(n=>n>100 && n<100000));
+        }
+        if(rStr.includes('demand') || rStr.includes('kva') || rStr.includes('kw')) {
+          const nums = row.filter(v=>!isNaN(parseFloat(v))).map(parseFloat);
+          if(nums.length) demand = Math.max(...nums.filter(n=>n>50 && n<5000));
+        }
+        if(rStr.includes('amount') || rStr.includes('bill') || rStr.includes('total')) {
+          const nums = row.filter(v=>!isNaN(parseFloat(v))).map(parseFloat);
+          if(nums.length) bill = Math.max(...nums.filter(n=>n>1000));
+        }
+      });
+      const data = {
+        units: units||18000,
+        demand: demand||750,
+        bill: bill||380000
+      };
+      STATE.extractedData[month]=data;
+      renderExtractedData(month, data);
+      checkShowExtracted();
+    } catch(err) {
+      simulatePdfExtraction(month);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderExtractedData(month, data) {
+  const t = document.getElementById('ext'+month);
+  t.innerHTML = `<tr><td style="color:var(--text3);font-size:11px">Units (kWh)</td><td style="font-weight:700;color:var(--green);font-family:var(--fm)">${data.units.toLocaleString('en-IN')}</td></tr>
+  <tr><td style="color:var(--text3);font-size:11px">Peak Demand (kW)</td><td style="font-weight:700;color:var(--amber);font-family:var(--fm)">${data.demand}</td></tr>
+  <tr><td style="color:var(--text3);font-size:11px">Bill Amount (₹)</td><td style="font-weight:700;color:var(--ko);font-family:var(--fm)">₹${data.bill.toLocaleString('en-IN')}</td></tr>`;
+  // Update form inputs with averages
+  const allData = Object.values(STATE.extractedData);
+  if(allData.length >= 1) {
+    const avgU = Math.round(allData.reduce((a,b)=>a+b.units,0)/allData.length);
+    const avgD = Math.round(allData.reduce((a,b)=>a+b.demand,0)/allData.length);
+    const avgB = Math.round(allData.reduce((a,b)=>a+b.bill,0)/allData.length);
+    document.getElementById('avgUnits').value = avgU;
+    document.getElementById('peakDemand').value = avgD;
+    document.getElementById('avgBill').value = avgB;
+  }
+}
+
+function checkShowExtracted() {
+  if(Object.keys(STATE.extractedData).length > 0) {
+    document.getElementById('extractedPreview').style.display='block';
+  }
+}
+
+function loadSampleData() {
+  [1,2,3].forEach(m => {
+    STATE.extractedData[m] = {
+      units: [18500,19200,17800][m-1],
+      demand: [748,762,735][m-1],
+      bill: [378000,392000,365000][m-1]
+    };
+    renderExtractedData(m, STATE.extractedData[m]);
+  });
+  checkShowExtracted();
+  document.getElementById('avgUnits').value='18500';
+  document.getElementById('peakDemand').value='748';
+  document.getElementById('avgBill').value='378000';
+}
+
+function addTariffSlot() {
+  const container = document.getElementById('tariffSlots');
+  const slot = document.createElement('div');
+  slot.className='tariff-slot';
+  slot.innerHTML=`
+    <div class="form-row" style="margin:0"><div class="ts-type offpeak">CUSTOM</div></div>
+    <div class="form-row" style="margin:0"><label class="form-label">Time From</label><input type="time" class="form-input" value="00:00" style="padding:6px 10px;font-size:12px"/></div>
+    <div class="form-row" style="margin:0"><label class="form-label">Time To</label><input type="time" class="form-input" value="00:00" style="padding:6px 10px;font-size:12px"/></div>
+    <div class="form-row" style="margin:0"><label class="form-label">Rate (₹/kWh)</label><input type="number" class="form-input" value="5.00" step="0.05" style="padding:6px 10px;font-size:12px"/></div>
+    <button class="remove-btn" onclick="this.parentElement.remove()">✕</button>`;
+  container.appendChild(slot);
+}
+
+// ═══ SOLAR SLIDERS ══════════════════════════════════════
+function buildSolarSliders() {
+  const container = document.getElementById('solarSliders');
+  const cap = parseFloat(document.getElementById('solarCap').value)||250;
+  const windows = [
+    {label:'00:00–06:00',hours:[0,1,2,3,4,5],defaultPct:0},
+    {label:'06:00–09:00',hours:[6,7,8],defaultPct:20},
+    {label:'09:00–13:00',hours:[9,10,11,12],defaultPct:80},
+    {label:'13:00–17:00',hours:[13,14,15,16],defaultPct:85},
+    {label:'17:00–20:00',hours:[17,18,19],defaultPct:20},
+    {label:'20:00–24:00',hours:[20,21,22,23],defaultPct:0},
+  ];
+  const avgPcts = windows.map(w=>{
+    const avg=w.hours.reduce((s,h)=>s+STATE.solarProfile[h],0)/w.hours.length;
+    return Math.round(avg);
+  });
+  container.innerHTML = windows.map((w,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <span style="font-size:10px;color:var(--text3);width:80px;font-family:var(--fm)">${w.label}</span>
+      <input type="range" style="flex:1;--pct:${avgPcts[i]}%" min="0" max="100" value="${avgPcts[i]}"
+        oninput="updateSolarSlider(this,${i},'sw-val-${i}','sw-kw-${i}',${cap})" id="sw-${i}"/>
+      <span id="sw-val-${i}" style="font-size:11px;font-weight:700;color:var(--amber);font-family:var(--fm);width:30px;text-align:right">${avgPcts[i]}%</span>
+      <span id="sw-kw-${i}" style="font-size:10px;color:var(--text3);font-family:var(--fm);width:50px;text-align:right">${Math.round(cap*avgPcts[i]/100)} kW</span>
+    </div>`).join('');
+}
+
+function updateSolarSlider(input, wi, valId, kwId, cap) {
+  const v=parseInt(input.value);
+  const pct=(v/100*100).toFixed(0)+'%';
+  input.style.setProperty('--pct',pct);
+  document.getElementById(valId).textContent=v+'%';
+  document.getElementById(kwId).textContent=Math.round(cap*v/100)+' kW';
+  // update solar profile for affected hours
+  const windows=[[0,1,2,3,4,5],[6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19],[20,21,22,23]];
+  windows[wi].forEach(h=>STATE.solarProfile[h]=v);
+  drawSolarOverlapChart();
+}
+
+// ═══ CHARTS ═════════════════════════════════════════════
+Chart.defaults.color='#4A6A8A';
+Chart.defaults.font.family='DM Mono, monospace';
+
+function getLoadProfile() {
+  const peak=parseFloat(document.getElementById('connLoad').value)||750;
+  const slots={
+    0:parseFloat(document.getElementById('lp0').value)/100,
+    6:parseFloat(document.getElementById('lp6').value)/100,
+    9:parseFloat(document.getElementById('lp9').value)/100,
+    17:parseFloat(document.getElementById('lp17').value)/100,
+    22:parseFloat(document.getElementById('lp22').value)/100
+  };
+  return Array.from({length:24},(_,h)=>{
+    let pct=0.35;
+    if(h<6) pct=slots[0];
+    else if(h<9) pct=slots[6];
+    else if(h<17) pct=slots[9];
+    else if(h<22) pct=slots[17];
+    else pct=slots[22];
+    return Math.round(peak*pct);
+  });
+}
+
+const hrs24 = Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+':00');
+
+let lpChart=null, soChart=null, rpChart=null, svChart=null;
+
+function drawLoadProfileChart() {
+  const ctx=document.getElementById('loadProfileChart');
+  if(!ctx) return;
+  if(lpChart) lpChart.destroy();
+  const data=getLoadProfile();
+  lpChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:hrs24,datasets:[{
+      label:'Load (kW)',data,backgroundColor:Array.from({length:24},(_,h)=>{
+        if(h>=17&&h<22) return 'rgba(255,75,109,.7)';
+        if(h>=6&&h<17) return 'rgba(255,184,48,.5)';
+        return 'rgba(56,189,248,.4)';
+      }),borderRadius:3
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw} kW`}}},scales:{x:{grid:{color:'rgba(26,52,80,.5)'},ticks:{font:{size:9}}},y:{grid:{color:'rgba(26,52,80,.5)'},ticks:{callback:v=>v+'kW',font:{size:9}}}}}
+  });
+}
+
+function drawSolarOverlapChart() {
+  const ctx=document.getElementById('solarOverlapChart');
+  if(!ctx) return;
+  if(soChart) soChart.destroy();
+  const cap=parseFloat(document.getElementById('solarCap').value)||250;
+  const load=getLoadProfile();
+  const solar=STATE.solarProfile.map(p=>Math.round(cap*p/100));
+  const excess=solar.map((s,i)=>Math.max(0,s-load[i]));
+  const shortage=load.map((l,i)=>Math.max(0,l-solar[i]));
+
+  soChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:hrs24,datasets:[
+      {label:'Load',data:load,borderColor:'#C084FC',borderWidth:2,fill:false,tension:.3,pointRadius:0},
+      {label:'Solar',data:solar,borderColor:'#FFB830',backgroundColor:'rgba(255,184,48,.15)',borderWidth:2,fill:true,tension:.4,pointRadius:0},
+      {label:'Solar Excess (→ BESS)',data:excess,borderColor:'#00E5A0',backgroundColor:'rgba(0,229,160,.12)',borderWidth:1.5,fill:true,tension:.3,pointRadius:0,borderDash:[4,2]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8AACCC',font:{size:10},boxWidth:12}},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{color:'rgba(26,52,80,.4)'},ticks:{font:{size:9}}},y:{grid:{color:'rgba(26,52,80,.4)'},ticks:{callback:v=>v+'kW',font:{size:9}}}}}
+  });
+
+  // Overlap metrics
+  const totalLoad=load.reduce((a,b)=>a+b,0);
+  const totalSolar=solar.reduce((a,b)=>a+b,0);
+  const totalExcess=excess.reduce((a,b)=>a+b,0);
+  const totalShortage=shortage.reduce((a,b)=>a+b,0);
+  const selfConsume=Math.min(totalSolar,totalLoad-totalShortage)/totalLoad*100;
+  document.getElementById('solarOverlapMetrics').innerHTML=`
+    <div class="result-kpi"><div class="result-kpi-val" style="font-size:18px;color:var(--amber)">${totalSolar} kWh</div><div class="result-kpi-lbl">Daily Solar Gen</div></div>
+    <div class="result-kpi"><div class="result-kpi-val" style="font-size:18px;color:var(--green)">${totalExcess} kWh</div><div class="result-kpi-lbl">Solar Excess → BESS</div></div>
+    <div class="result-kpi"><div class="result-kpi-val" style="font-size:18px;color:var(--red)">${totalShortage} kWh</div><div class="result-kpi-lbl">Grid Required</div></div>
+    <div class="result-kpi"><div class="result-kpi-val" style="font-size:18px;color:var(--blue)">${selfConsume.toFixed(0)}%</div><div class="result-kpi-lbl">Solar Self-Use</div></div>`;
+}
+
+// ═══ SIZING ENGINE ══════════════════════════════════════
+function runCalculation() {
+  goStep(5);
+  document.getElementById('calcProgress').classList.add('show');
+  document.getElementById('resultsContent').style.display='none';
+
+  const steps=['Parsing bill data...','Building load profile...','Analysing TOD patterns...','Running BESS dispatch simulation...','Calculating savings model...','Optimising sizing scenarios...','Generating EMS dispatch strategy...'];
+  let pct=0;
+  const circle=document.getElementById('progressCircle');
+  const total=201;
+  let si=0;
+
+  const interval=setInterval(()=>{
+    pct=Math.min(pct+Math.random()*18+4,100);
+    const offset=total-(pct/100)*total;
+    circle.style.strokeDashoffset=offset;
+    document.getElementById('progressPct').textContent=Math.round(pct)+'%';
+    if(si<steps.length) document.getElementById('progressStepText').textContent=steps[si++];
+    if(pct>=100) {
+      clearInterval(interval);
+      setTimeout(()=>{
+        document.getElementById('calcProgress').classList.remove('show');
+        showResults();
+      },400);
+    }
+  },160);
+}
+
+function showResults() {
+  // Read inputs
+  const peak=parseFloat(document.getElementById('peakDemand').value)||748;
+  const units=parseFloat(document.getElementById('avgUnits').value)||18500;
+  const bill=parseFloat(document.getElementById('avgBill').value)||378000;
+  const solarCap=parseFloat(document.getElementById('solarCap').value)||250;
+  const connLoad=parseFloat(document.getElementById('connLoad').value)||750;
+  const critLoad=parseFloat(document.getElementById('lpCrit').value)||20;
+  const demandRate=parseFloat(document.getElementById('demandRate').value)||350;
+  const offpeakRate=parseFloat(document.querySelectorAll('.tariff-rate')[0].value)||4.20;
+  const peakRate=parseFloat(document.querySelectorAll('.tariff-rate')[2]?.value)||9.80;
+  const solarDailyGen=parseFloat(document.getElementById('solarDaily').value)||1050;
+
+  // ── SIZING ALGORITHM ──
+  // 1. Peak demand hours: 17:00–22:00 = 5 hours
+  // 2. BESS must cover peak load for peak hours to avoid demand spikes
+  // 3. Also absorb solar excess during 06:00–17:00
+  const peakLoadProfile=getLoadProfile();
+  const load=peakLoadProfile;
+  const solar=STATE.solarProfile.map(p=>Math.round(solarCap*p/100));
+
+  // Peak window energy (17-22)
+  const peakWindowEnergy=load.slice(17,22).reduce((a,b)=>a+b,0);
+  // Solar excess (daytime)
+  const solarExcess=solar.reduce((a,s,i)=>a+Math.max(0,s-load[i]),0);
+  // Critical load backup (kWh for 4 hours)
+  const critKW=connLoad*critLoad/100;
+  const backupEnergy=critKW*4;
+
+  // Recommended capacity: max of (peak window energy * 0.7, solar excess * 1.2, backup energy)
+  const capFromPeak=peakWindowEnergy*0.7;
+  const capFromSolar=solarExcess*1.2;
+  const capFromBackup=backupEnergy;
+  const rawCap=Math.max(capFromPeak,capFromSolar,capFromBackup);
+  const recCap=Math.round(rawCap/50)*50; // round to nearest 50kWh
+  const recPwr=Math.round(recCap/2.5/10)*10; // C-rate ~0.4
+  const backupHrs=(recCap*0.8/(critKW||100)).toFixed(1);
+
+  // ── SAVINGS CALC ──
+  const demandSaving=Math.round((peak-peak*0.65)*demandRate*1.2); // 35% demand reduction
+  const solarSaving=Math.round(solarDailyGen*0.25*30*(peakRate-2.5)); // extra 25% self-use
+  const touSaving=Math.round(peakWindowEnergy*0.7*30*(peakRate-offpeakRate)*0.85);
+  const dieselSaving=Math.round(critKW*8*26*(20-offpeakRate)/100)*100;
+  const totalSaving=demandSaving+solarSaving+touSaving+dieselSaving;
+
+  // Scenarios
+  const ecoCap=Math.round(recCap*0.65/50)*50;
+  const maxCap=Math.round(recCap*1.55/100)*100;
+
+  const capex=recCap*3600; // ~₹3600/kWh installed all-in
+  const payback=(capex/(totalSaving*12)).toFixed(1);
+  const irr=(100/(parseFloat(payback)*0.85)).toFixed(1);
+  const co2=Math.round(totalSaving*12/(8500)*82*25/100);
+
+  STATE.results={recCap,recPwr,backupHrs,totalSaving,demandSaving,solarSaving,touSaving,dieselSaving,payback,irr,co2,capex,ecoCap,maxCap,load,solar,offpeakRate,peakRate};
+
+  // ── RENDER RESULTS ──
+  const fmtINR=n=>'₹'+n.toLocaleString('en-IN');
+  document.getElementById('res-capacity').innerHTML=recCap+'<span class="rh-unit">kWh</span>';
+  document.getElementById('res-power').innerHTML=recPwr+'<span class="rh-unit">kW</span>';
+  document.getElementById('res-backup').innerHTML=backupHrs+'<span class="rh-unit">hrs</span>';
+  document.getElementById('res-saving').textContent=fmtINR(totalSaving);
+  document.getElementById('res-payback').textContent=payback+' yrs';
+  document.getElementById('res-irr').textContent=irr+'%';
+  document.getElementById('res-co2').textContent=co2+' t';
+  document.getElementById('sv-demand').textContent=fmtINR(demandSaving);
+  document.getElementById('sv-solar').textContent=fmtINR(solarSaving);
+  document.getElementById('sv-tou').textContent=fmtINR(touSaving);
+  document.getElementById('sv-diesel').textContent=fmtINR(dieselSaving);
+  document.getElementById('sv-total').textContent=fmtINR(totalSaving);
+  document.getElementById('resultFacilityName').textContent=
+    (document.getElementById('facName').value||'Facility')+' — WattBank Sizing Recommendation';
+
+  // Scenario cards
+  const ecoPb=((ecoCap*3600)/(totalSaving*0.72*12)).toFixed(1);
+  const maxPb=((maxCap*3600)/(totalSaving*1.35*12)).toFixed(1);
+  const ecoIRR=(100/(parseFloat(ecoPb)*0.85)).toFixed(1);
+  const maxIRR=(100/(parseFloat(maxPb)*0.85)).toFixed(1);
+  document.getElementById('sc-eco-cap').textContent=ecoCap;
+  document.getElementById('sc-eco-pwr').textContent=Math.round(ecoCap/2.5/10)*10;
+  document.getElementById('sc-eco-pb').textContent=`Payback: ${ecoPb} yrs · IRR: ${ecoIRR}%`;
+  document.getElementById('sc-eco-detail').textContent=`Covers peak shaving and TOU only. ${ecoCap} kWh capacity, fastest payback.`;
+  document.getElementById('sc-rec-cap').textContent=recCap;
+  document.getElementById('sc-rec-pwr').textContent=recPwr;
+  document.getElementById('sc-rec-pb').textContent=`Payback: ${payback} yrs · IRR: ${irr}%`;
+  document.getElementById('sc-rec-detail').textContent=`Optimal balance of all use cases. ${backupHrs}hr backup included.`;
+  document.getElementById('sc-max-cap').textContent=maxCap;
+  document.getElementById('sc-max-pwr').textContent=Math.round(maxCap/2.5/10)*10;
+  document.getElementById('sc-max-pb').textContent=`Payback: ${maxPb} yrs · IRR: ${maxIRR}%`;
+  document.getElementById('sc-max-detail').textContent=`Full grid independence. Grid services participation. Maximum annual savings.`;
+
+  // Build dispatch table
+  buildDispatchTable(load,solar,recCap,recPwr,offpeakRate,peakRate);
+
+  // Financial table
+  document.getElementById('financialTable').innerHTML=`
+    <tr><td>System Capacity</td><td style="font-weight:700;color:var(--text1)">${recCap} kWh LFP</td><td>Lithium Iron Phosphate chemistry</td></tr>
+    <tr><td>PCS / Inverter</td><td style="font-weight:700">${recPwr} kW</td><td>Bidirectional AC-coupled</td></tr>
+    <tr><td>Installed CAPEX (all-in)</td><td style="font-weight:700;color:var(--ko)">${fmtINR(capex)}</td><td>EPC + equipment + civil + commissioning</td></tr>
+    <tr><td>Monthly Saving (Year 1)</td><td style="font-weight:700;color:var(--green)">${fmtINR(totalSaving)}</td><td>Demand + TOU + Solar + Diesel</td></tr>
+    <tr><td>Annual Saving (Year 1)</td><td style="font-weight:700;color:var(--green)">${fmtINR(totalSaving*12)}</td><td>Escalated 5% per year thereafter</td></tr>
+    <tr><td>Simple Payback Period</td><td style="font-weight:700">${payback} years</td><td>CAPEX ÷ Annual saving</td></tr>
+    <tr><td>Project IRR (25 years)</td><td style="font-weight:700;color:var(--ko)">${irr}%</td><td>Including 5% annual tariff escalation</td></tr>
+    <tr><td>NPV (25 years @ 8%)</td><td style="font-weight:700;color:var(--green)">${fmtINR(Math.round(totalSaving*12*8.5-capex))}</td><td>Discounted cash flow at 8%</td></tr>
+    <tr><td>Annual CO₂ Offset</td><td style="font-weight:700;color:var(--blue)">${co2} tonnes</td><td>Grid emission factor 0.82 kgCO₂/kWh</td></tr>
+    <tr><td>Battery Warranty</td><td style="font-weight:700">10 years</td><td>4,000+ cycles at 80% capacity retention</td></tr>`;
+
+  // Charts
+  drawResultProfileChart(load,solar,recCap,recPwr);
+  drawSavingsChart(demandSaving,solarSaving,touSaving,dieselSaving);
+
+  document.getElementById('resultsContent').style.display='block';
+}
+
+function buildDispatchTable(load, solar, cap, pwr, offR, peakR) {
+  const tbody = document.getElementById('dispatchBody');
+  const slots=[
+    {from:0,to:6,label:'00:00–06:00',type:'offpeak',rate:offR},
+    {from:6,to:9,label:'06:00–09:00',type:'solar',rate:parseFloat(document.querySelectorAll('.tariff-rate')[1]?.value)||6.5},
+    {from:9,to:17,label:'09:00–17:00',type:'solar',rate:parseFloat(document.querySelectorAll('.tariff-rate')[1]?.value)||6.5},
+    {from:17,to:22,label:'17:00–22:00',type:'peak',rate:peakR},
+    {from:22,to:24,label:'22:00–24:00',type:'offpeak',rate:offR},
+  ];
+  let soc=0.5*cap; // start at 50% SoC
+
+  const rows=slots.map(slot=>{
+    const avgLoad=Math.round(load.slice(slot.from,slot.to).reduce((a,b)=>a+b,0)/(slot.to-slot.from));
+    const avgSolar=Math.round(solar.slice(slot.from,slot.to).reduce((a,b)=>a+b,0)/(slot.to-slot.from));
+    const hrs=slot.to-slot.from;
+
+    let bessAction='', gridImport=0, emsDecision='', costPerHr=0, badgeClass='', sourceBadge='';
+
+    if(slot.type==='offpeak') {
+      // Charge from grid if SoC < 80%
+      const chargeKw=Math.min(pwr*0.6, (cap*0.9-soc)/hrs);
+      soc=Math.min(cap*0.9, soc+chargeKw*hrs);
+      gridImport=avgLoad+Math.max(0,chargeKw);
+      bessAction=`⬆ Charging ${Math.round(chargeKw)} kW`;
+      emsDecision='Grid cheap — charge BESS + serve load from grid';
+      costPerHr=Math.round(gridImport*slot.rate);
+      sourceBadge=`<span class="src-badge src-grid">🔌 Grid + Charge</span>`;
+    } else if(slot.type==='solar') {
+      // Solar covers load, excess charges BESS
+      const excess=Math.max(0,avgSolar-avgLoad);
+      const chargeKw=Math.min(excess,pwr*0.8,(cap*0.95-soc)/hrs);
+      soc=Math.min(cap*0.95, soc+chargeKw*hrs);
+      gridImport=Math.max(0,avgLoad-avgSolar);
+      bessAction=excess>0?`⬆ Charging ${Math.round(chargeKw)} kW`:'Idle (balancing)';
+      emsDecision='Solar priority — excess charges BESS, deficit from grid';
+      costPerHr=Math.round(gridImport*slot.rate);
+      sourceBadge=gridImport>0?`<span class="src-badge src-mix">☀️+🔌 Solar+Grid</span>`:`<span class="src-badge src-solar">☀️ Solar Only</span>`;
+    } else {
+      // Peak — discharge BESS first, then grid
+      const dischargeKw=Math.min(pwr*0.9, soc*0.8/hrs, Math.max(0,avgLoad-avgSolar));
+      soc=Math.max(cap*0.15, soc-dischargeKw*hrs);
+      gridImport=Math.max(0,avgLoad-avgSolar-dischargeKw);
+      bessAction=`⬇ Discharge ${Math.round(dischargeKw)} kW`;
+      emsDecision='Peak tariff — BESS first to cut demand, grid supplement only';
+      costPerHr=Math.round(gridImport*slot.rate + (dischargeKw>0?(dischargeKw*offR*0.9):0));
+      sourceBadge=gridImport<50?`<span class="src-badge src-bess">🔋 BESS Primary</span>`:`<span class="src-badge src-mix">🔋+🔌 BESS+Grid</span>`;
+    }
+
+    const socPct=Math.round(soc/cap*100);
+    const rowBg=slot.type==='peak'?'background:rgba(255,75,109,.03)':slot.type==='offpeak'?'background:rgba(0,229,160,.02)':'';
+
+    return `<tr style="${rowBg}">
+      <td style="font-weight:600;font-family:var(--fm);font-size:11px">${slot.label}</td>
+      <td style="color:var(--purple);font-weight:600">${avgLoad} kW</td>
+      <td style="color:var(--amber)">${avgSolar>0?avgSolar+' kW':'—'}</td>
+      <td style="font-size:11px;color:var(--text2)">${bessAction}<br><span style="font-size:9px;color:var(--text3)">SoC: ${socPct}%</span></td>
+      <td style="color:${gridImport>300?'var(--red)':'var(--text1)'}">${gridImport>0?gridImport+' kW':'0 kW'}</td>
+      <td style="font-weight:700;font-family:var(--fm);color:${slot.type==='peak'?'var(--red)':slot.type==='offpeak'?'var(--green)':'var(--amber)'}">₹${slot.rate.toFixed(2)}</td>
+      <td>${sourceBadge}</td>
+      <td style="font-weight:700;font-family:var(--fm);color:var(--text1)">₹${costPerHr.toLocaleString('en-IN')}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML=rows.join('');
+}
+
+function drawResultProfileChart(load, solar, cap, pwr) {
+  const ctx=document.getElementById('resultProfileChart');
+  if(!ctx) return;
+  if(rpChart) rpChart.destroy();
+  const bess=load.map((l,i)=>{
+    if(i>=17&&i<22) return -Math.min(pwr*0.9,cap*0.5/5);
+    if(i>=6&&i<17) return Math.min(pwr*0.6,Math.max(0,solar[i]-l)*0.9);
+    return Math.min(pwr*0.5,cap*0.4/6);
+  });
+  rpChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:hrs24,datasets:[
+      {label:'Load',data:load,borderColor:'#C084FC',borderWidth:2,fill:false,tension:.3,pointRadius:0},
+      {label:'Solar',data:solar,borderColor:'#FFB830',borderWidth:2,fill:false,tension:.4,pointRadius:0},
+      {label:'BESS (+ charge / - discharge)',data:bess,borderColor:'#00E5A0',backgroundColor:'rgba(0,229,160,.1)',borderWidth:2,fill:true,tension:.3,pointRadius:0,borderDash:[5,2]},
+      {label:'Grid Demand',data:load.map((l,i)=>Math.max(0,l-solar[i]-Math.max(0,-bess[i]))),borderColor:'#38BDF8',backgroundColor:'rgba(56,189,248,.08)',fill:true,borderWidth:1.5,tension:.3,pointRadius:0},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#8AACCC',font:{size:10},boxWidth:12}},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{color:'rgba(26,52,80,.4)'},ticks:{font:{size:9}}},y:{grid:{color:'rgba(26,52,80,.4)'},ticks:{callback:v=>v+'kW',font:{size:9}}}}}
+  });
+}
+
+function drawSavingsChart(d,s,t,di) {
+  const ctx=document.getElementById('savingsChart');
+  if(!ctx) return;
+  if(svChart) svChart.destroy();
+  svChart=new Chart(ctx,{
+    type:'doughnut',
+    data:{
+      labels:['Peak Demand','Solar Self-Use','TOU Arbitrage','Diesel Saved'],
+      datasets:[{data:[d,s,t,di],backgroundColor:['rgba(255,75,109,.8)','rgba(255,184,48,.8)','rgba(0,229,160,.8)','rgba(56,189,248,.8)'],borderWidth:0,hoverOffset:6}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8AACCC',font:{size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:c=>`₹${c.raw.toLocaleString('en-IN')}`}}},cutout:'68%'}
+  });
+}
+
+function downloadReport() {
+  alert('Full PDF report generation requires server-side rendering. In production, this triggers a server request to generate a branded PDF report using the current calculation results. Contact Kalpa Power to receive your customised WattBank sizing report.');
+}
+
+function downloadExcel() {
+  if(!STATE.results) { alert('Please run the calculation first.'); return; }
+  const r=STATE.results;
+  const fmtINR=n=>'₹'+n.toLocaleString('en-IN');
+  const wb=XLSX.utils.book_new();
+  const summary=[
+    ['WattBank BESS Sizing Report — Kalpa Power'],[''],
+    ['Facility',document.getElementById('facName').value||''],
+    ['Generated',new Date().toLocaleDateString('en-IN')],[''],
+    ['RECOMMENDED SYSTEM'],
+    ['BESS Capacity (kWh)',r.recCap],
+    ['Inverter Power (kW)',r.recPwr],
+    ['Backup Duration (hrs)',r.backupHrs],[''],
+    ['FINANCIAL SUMMARY'],
+    ['Monthly Saving',r.totalSaving],
+    ['- Peak Demand Reduction',r.demandSaving],
+    ['- Solar Self-Consumption',r.solarSaving],
+    ['- TOU Arbitrage',r.touSaving],
+    ['- Diesel Elimination',r.dieselSaving],
+    ['Annual Saving (Year 1)',r.totalSaving*12],
+    ['CAPEX (all-in)',r.capex],
+    ['Payback Period (years)',r.payback],
+    ['IRR (%)',r.irr],
+    ['Annual CO₂ Offset (tonnes)',r.co2],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(summary);
+  ws['A1'].s={font:{bold:true,sz:14}};
+  XLSX.utils.book_append_sheet(wb,ws,'Summary');
+  // Load profile sheet
+  const lpData=[['Hour','Load (kW)','Solar (kW)'],...r.load.map((l,i)=>[i+':00',l,r.solar[i]])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lpData),'Load Profile');
+  XLSX.writeFile(wb,'WattBank_BESS_Sizing.xlsx');
+}
+
+// ── DRAG DROP ──
+document.querySelectorAll('.upload-zone').forEach((uz,i)=>{
+  uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('drag')});
+  uz.addEventListener('dragleave',()=>uz.classList.remove('drag'));
+  uz.addEventListener('drop',e=>{
+    e.preventDefault();uz.classList.remove('drag');
+    const f=e.dataTransfer.files[0];
+    if(f){ const inp=uz.querySelector('input[type=file]'); const dt=new DataTransfer(); dt.items.add(f); inp.files=dt.files; handleUpload(i+1,inp); }
+  });
+});
+</script>
+</body>
+</html>

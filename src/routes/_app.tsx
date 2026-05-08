@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Topbar } from "../components/wb/Topbar";
 import { Sidebar } from "../components/wb/Sidebar";
+import { BessCalculatorPopup } from "../components/wb/BessCalculatorPopup";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -18,6 +19,7 @@ function AppLayout() {
           </div>
         </main>
       </div>
+      <BessCalculatorPopup />
     </div>
   );
 }

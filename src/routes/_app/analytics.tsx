@@ -51,7 +51,7 @@ function Analytics() {
                 <CartesianGrid stroke="var(--wb-border)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="d" tick={{ fontSize: 10, fill: "var(--wb-text3)" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "var(--wb-text3)" }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} formatter={(v: number) => v.toFixed(2)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
                 <Bar dataKey="Solar" stackId="a" fill="var(--wb-amber)" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="Discharge" stackId="a" fill="var(--wb-green)" />
@@ -70,7 +70,7 @@ function Analytics() {
                 <Pie data={mix} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={3}>
                   {mix.map((m) => <Cell key={m.name} fill={m.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} formatter={(v: number) => v.toFixed(2)} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -93,7 +93,7 @@ function Analytics() {
               <CartesianGrid stroke="var(--wb-border)" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="h" tick={{ fontSize: 10, fill: "var(--wb-text3)" }} interval={2} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: "var(--wb-text3)" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--wb-border)", fontSize: 12 }} formatter={(v: number) => v.toFixed(2)} />
               <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
               <Line type="stepAfter" dataKey="Tariff" stroke="var(--wb-blue)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="Effective" stroke="var(--wb-orange)" strokeWidth={2.5} dot={false} />

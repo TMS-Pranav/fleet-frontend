@@ -117,7 +117,7 @@ function Overview() {
             <span className="text-[11px] text-[var(--wb-text3)]">May 2026</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Peak Shaving" value="₹ 38,420" tone="green" />
+            <Stat label="Peak Saving" value="₹ 38,420" tone="green" />
             <Stat label="Solar Self-Use" value="₹ 51,210" tone="amber" />
             <Stat label="TOU Arbitrage" value="₹ 22,840" tone="blue" />
             <Stat label="Total Saving" value="₹ 1,12,470" tone="orange" highlight />
